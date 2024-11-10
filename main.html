@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云盘主界面</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            min-height: 100vh;
+        }
+        .sidebar {
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+        }
+        .main-content {
+            height: 100vh;
+            overflow-y: auto;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+        }
+        .file-item {
+            padding: 12px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.95);
+            margin-bottom: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .file-item:hover {
+            background: #ffffff;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        .upload-drop-zone {
+            border: 2px dashed #8fd3f4;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            transition: all 0.3s ease;
+        }
+        .upload-drop-zone.dragover {
+            background: rgba(143, 211, 244, 0.1);
+            border-color: #84fab0;
+        }
+        .modal-body {
+            min-height: 200px;
+        }
+        .progress-bar {
+            transition: width 0.1s ease;
+            background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+        }
+        #fileList {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .breadcrumb {
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        .breadcrumb-item a {
+            color: #6c757d;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .breadcrumb-item a:hover {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+        .btn {
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .modal-content {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+        .list-group-item {
+            border-radius: 6px !important;
+            margin-bottom: 5px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .list-group-item:hover {
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+        .list-group-item.active {
+            background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+            border: none;
+        }
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        .sidebar .btn-outline-secondary {
+            transition: all 0.3s ease;
+        }
+        .sidebar .btn-outline-secondary:hover {
+            background: rgba(108, 117, 125, 0.1);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-2 sidebar">
+                <h4 class="mb-4">欢迎来到网盘</h4>
+                <div class="list-group mb-4">
+                    <a href="#" class="list-group-item list-group-item-action active" onclick="openFolder(''); return false;">全部文件</a>
+                </div>
+                <button class="btn btn-outline-secondary w-100" onclick="showSettingsModal()">
+                    <i class="fas fa-cog me-2"></i>设置
+                </button>
+            </div>
+
+            <!-- 主要内容 -->
+            <div class="col-md-10 main-content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb" id="pathBreadcrumb">
+                                <li class="breadcrumb-item">
+                                    <a href="#" onclick="openFolder(\'\'); return false;">全部文件</a>
+                                </li>
+                            </ol>
+                        </nav>
+                    </div>
+                    <div>
+                        <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                            <i class="fas fa-upload me-1"></i>上传
+                        </button>
+                        <button class="btn btn-success" onclick="showNewFolderModal()">
+                            <i class="fas fa-folder-plus me-1"></i>新建文件夹
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 文件列表 -->
+                <div class="file-list" id="mainFileList">
+                    <!-- 文件列表将通过 JavaScript 动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 上传模态框 -->
+    <div class="modal fade" id="uploadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">上传文件</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="upload-drop-zone" id="dropZone">
+                        <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
+                        <p>拖拽文件到这里或点击选择文件</p>
+                        <input type="file" id="fileInput" multiple style="display: none">
+                    </div>
+                    <div id="fileList" class="mt-3">
+                        <!-- 文列表将在这里动态显示 -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="uploadBtn">开始上传</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建文件夹模态框 -->
+    <div class="modal fade" id="newFolderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新建文件夹</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="folderName" class="form-label">文件夹名称</label>
+                        <input type="text" class="form-control" id="folderName" placeholder="请输入文件夹名称">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="createFolder()">创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改分享设置模态框 -->
+    <div class="modal fade" id="shareModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">分享文件</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- 已存在的分享信息 -->
+                    <div id="existingShare" class="d-none mb-4">
+                        <div class="alert alert-info">
+                            <h6 class="mb-2">当前分享设置</h6>
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" id="existingShareLink" readonly>
+                                <button class="btn btn-outline-secondary" onclick="copyShareLink('existingShareLink')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted" id="sharePassword"></small>
+                                <button class="btn btn-sm btn-outline-primary ms-2" onclick="showModifyPassword()">
+                                    <i class="fas fa-edit"></i> 修改密码
+                                </button>
+                            </div>
+                            <!-- 添加改密码表单 -->
+                            <div id="modifyPasswordForm" class="d-none mt-2">
+                                <div class="input-group">
+                                    <input type="text" class="form-control form-control-sm" id="modifiedPassword" 
+                                           placeholder="输入新密码，留空则无需密码">
+                                    <button class="btn btn-sm btn-outline-success" onclick="updateSharePassword()">
+                                        确认
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="cancelModifyPassword()">
+                                        取消
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="cancelShare()">
+                            <i class="fas fa-times me-1"></i>取消分享
+                        </button>
+                        <hr>
+                    </div>
+                    
+                    <!-- 新建分享设置 -->
+                    <div id="newShare">
+                        <div class="mb-3">
+                            <label for="newSharePassword" class="form-label">访问密码（可选）</label>
+                            <input type="text" class="form-control" id="newSharePassword" placeholder="留空则无需密码">
+                        </div>
+                        <div id="shareLink" class="d-none">
+                            <div class="alert alert-success">
+                                <p class="mb-2">分享链接：</p>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="shareLinkInput" readonly>
+                                    <button class="btn btn-outline-secondary" onclick="copyShareLink('shareLinkInput')">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeShareModal()">闭</button>
+                    <button type="button" class="btn btn-primary" id="createShareBtn" onclick="createShare()">创建分享</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加设置模态框 -->
+    <div class="modal fade" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">系统设置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <h6 class="mb-3">修改密码</h6>
+                        <form id="changePasswordForm">
+                            <div class="mb-3">
+                                <label for="currentPassword" class="form-label">当前密码</label>
+                                <input type="password" class="form-control" id="currentPassword" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="newPassword" class="form-label">新密码</label>
+                                <input type="password" class="form-control" id="newPassword" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="confirmPassword" class="form-label">确认新密码</label>
+                                <input type="password" class="form-control" id="confirmPassword" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">修改密码</button>
+                        </form>
+                    </div>
+                    <hr>
+                    <!-- 可以在这里添加其他设置选项 -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        class FileStorage {
+            constructor() {
+                this.baseUrl = 'file_handler.php';
+            }
+
+            // 保存文件
+            async saveFiles(files) {
+                const formData = new FormData();
+                for (let file of files) {
+                    formData.append('files[]', file);
+                }
+                formData.append('currentPath', currentPath);
+
+                const response = await fetch(this.baseUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+                return await response.json();
+            }
+
+            // 获取文件列表
+            async getFiles(path = '') {
+                const response = await fetch(this.baseUrl + '?path=' + encodeURIComponent(path));
+                if (!response.ok) {
+                    throw new Error('Failed to fetch files');
+                }
+                return await response.json();
+            }
+
+            // 下载文件
+            downloadFile(fileName) {
+                window.location.href = `fs/${fileName}`;
+            }
+
+            // 删除文件
+            async deleteFile(fileName) {
+                const response = await fetch(this.baseUrl + '?filename=' + fileName, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to delete file');
+                }
+                return await response.json();
+            }
+
+            // 创建文件夹
+            async createFolder(folderName) {
+                const formData = new FormData();
+                formData.append('action', 'createFolder');
+                formData.append('name', folderName);
+
+                const response = await fetch(this.baseUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to create folder');
+                }
+                return await response.json();
+            }
+        }
+
+        const fileStorage = new FileStorage();
+
+        // 处理拖拽上传
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFiles(e.dataTransfer.files);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFiles(e.target.files);
+            }
+        });
+
+        // 存储待上传的文件
+        let filesToUpload = [];
+
+        function handleFiles(files) {
+            filesToUpload = Array.from(files);
+            updateFileList();
+        }
+
+        function updateFileList() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+
+            if (filesToUpload.length === 0) {
+                return;
+            }
+
+            filesToUpload.forEach((file, index) => {
+                const fileSize = formatFileSize(file.size);
+                const fileItem = document.createElement('div');
+                fileItem.className = 'border-bottom py-2';
+                fileItem.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="text-truncate" style="max-width: 200px;">
+                            <i class="fas fa-file me-2"></i>${file.name}
+                        </div>
+                        <div>
+                            <small class="text-muted me-2">${fileSize}</small>
+                            <button class="btn btn-sm btn-outline-danger" onclick="removeFile(${index})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 3px;">
+                        <div class="progress-bar" id="progress-${index}" role="progressbar" style="width: 0%"></div>
+                    </div>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 添加移除文件功能
+        function removeFile(index) {
+            filesToUpload.splice(index, 1);
+            updateFileList();
+        }
+
+        // 添加当前路径变量
+        let currentPath = '';
+
+        // 修改加载文件列表函数
+        async function loadFileList(path = '') {
+            try {
+                currentPath = path || '';
+                const files = await fileStorage.getFiles(path);
+                const mainFileList = document.getElementById('mainFileList');
+                const breadcrumb = document.getElementById('pathBreadcrumb');
+                
+                // 更新面包屑导航
+                breadcrumb.innerHTML = '<li class="breadcrumb-item"><a href="#" onclick="openFolder(\'\'); return false;">全部文件</a></li>';
+                
+                // 修改路径处理逻辑
+                if (currentPath) {
+                    const pathParts = currentPath.split('/').filter(Boolean);
+                    let currentPathBuild = '';
+                    
+                    pathParts.forEach((part, index) => {
+                        currentPathBuild = pathParts.slice(0, index + 1).join('/');
+                        breadcrumb.innerHTML += `
+                            <li class="breadcrumb-item">
+                                <a href="#" onclick="openFolder('${currentPathBuild}'); return false;">${part}</a>
+                            </li>
+                        `;
+                    });
+                }
+                
+                // 添加返回上级目录按钮
+                mainFileList.innerHTML = currentPath ? `
+                    <div class="file-item d-flex justify-content-between align-items-center">
+                        <div style="cursor: pointer" onclick="openFolder('..')">
+                            <i class="fas fa-level-up-alt me-2"></i>
+                            返回上级目录
+                        </div>
+                        <div></div>
+                    </div>
+                ` : '';
+                
+                // 显示文件和文件夹
+                files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item d-flex justify-content-between align-items-center';
+                    
+                    if (file.isFolder) {
+                        fileItem.innerHTML = `
+                            <div style="cursor: pointer" onclick="openFolder('${file.name}')">
+                                <i class="fas fa-folder me-2"></i>
+                                ${file.name}
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFile('${file.name}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        fileItem.innerHTML = `
+                            <div>
+                                <i class="fas fa-file me-2"></i>
+                                ${file.name}
+                            </div>
+                            <div>
+                                <small class="text-muted me-3">${formatFileSize(file.size)}</small>
+                                <button class="btn btn-sm btn-outline-primary me-2" onclick="downloadFile('${file.name}')">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger me-2" onclick="deleteFile('${file.name}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-info" onclick="showShareModal('${file.name}')">
+                                    <i class="fas fa-share-alt"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+                    mainFileList.appendChild(fileItem);
+                });
+            } catch (error) {
+                console.error('加载文件列表失败:', error);
+            }
+        }
+
+        // 页面加载时获取文件列表
+        document.addEventListener('DOMContentLoaded', () => {
+            // 自动进入全部文件目录
+            openFolder('');
+            
+            // 激活侧边栏的"全部文件"选项
+            const allFilesLink = document.querySelector('.list-group-item');
+            if (allFilesLink) {
+                allFilesLink.classList.add('active');
+            }
+        });
+
+        // 上传文件处理
+        document.getElementById('uploadBtn').addEventListener('click', async () => {
+            try {
+                for (let i = 0; i < filesToUpload.length; i++) {
+                    const progressBar = document.getElementById(`progress-${i}`);
+                    progressBar.style.width = '50%';
+                }
+
+                await fileStorage.saveFiles(filesToUpload);
+
+                // 上传成功后的处理
+                for (let i = 0; i < filesToUpload.length; i++) {
+                    const progressBar = document.getElementById(`progress-${i}`);
+                    progressBar.style.width = '100%';
+                }
+
+                setTimeout(() => {
+                    alert('文件上传完成！');
+                    filesToUpload = [];
+                    updateFileList();
+                    loadFileList(currentPath);
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+                    modal.hide();
+                }, 500);
+
+            } catch (error) {
+                console.error('上传失败:', error);
+                alert('文件上传失败，请重试！');
+            }
+        });
+
+        // 修改下载文件函数
+        function downloadFile(filename) {
+            const filePath = currentPath ? `${currentPath}/${filename}` : filename;
+            window.location.href = `fs/${filePath}`;
+        }
+
+        // 修改删除文件函数
+        async function deleteFile(filename) {
+            if (confirm('确定要删除这个文件吗？')) {
+                const filePath = currentPath ? `${currentPath}/${filename}` : filename;
+                try {
+                    await fileStorage.deleteFile(filePath);
+                    loadFileList(currentPath);
+                } catch (error) {
+                    console.error('删除失败:', error);
+                    alert('删除失败，请重试！');
+                }
+            }
+        }
+
+        // 修改打开文件夹函数
+        function openFolder(folderName) {
+            let newPath;
+            if (folderName === '') {
+                // 返回根目录
+                newPath = '';
+            } else if (folderName === '..') {
+                // 返回上级目录
+                if (currentPath && typeof currentPath === 'string') {
+                    const pathParts = currentPath.split('/').filter(Boolean);
+                    pathParts.pop();
+                    newPath = pathParts.join('/');
+                } else {
+                    newPath = '';
+                }
+            } else if (currentPath) {
+                // 进入下级目录，确保路径不会重复
+                const currentParts = currentPath.split('/').filter(Boolean);
+                if (!currentParts.includes(folderName)) {
+                    newPath = currentPath + '/' + folderName;
+                } else {
+                    newPath = currentPath;
+                }
+            } else {
+                // 从根目录进入文件夹
+                newPath = folderName;
+            }
+            
+            // 清理路径中的多余斜杠
+            newPath = newPath.split('/').filter(Boolean).join('/');
+            loadFileList(newPath);
+        }
+
+        let currentShareFile = '';
+
+        // 显示分享设置窗口
+        async function showShareModal(filename) {
+            currentShareFile = filename;
+            const modal = new bootstrap.Modal(document.getElementById('shareModal'));
+            
+            // 清空之前的设置
+            document.getElementById('newSharePassword').value = '';
+            document.getElementById('shareLink').classList.add('d-none');
+            document.getElementById('existingShare').classList.add('d-none');
+            document.getElementById('newShare').classList.remove('d-none');
+            document.getElementById('createShareBtn').classList.remove('d-none');
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', 'getShare');
+                formData.append('filename', filename);
+                
+                const response = await fetch('file_handler.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.share) {
+                    // 显示现有分享信息
+                    document.getElementById('existingShare').classList.remove('d-none');
+                    document.getElementById('existingShareLink').value = `${window.location.origin}/share.php?id=${data.share.id}`;
+                    document.getElementById('sharePassword').textContent = data.share.password ? 
+                        `访问密码: ${data.share.password}` : '无需密码';
+                    document.getElementById('newShare').classList.add('d-none');
+                    document.getElementById('createShareBtn').classList.add('d-none');
+                }
+            } catch (error) {
+                console.error('获取分享信息失败:', error);
+            }
+            
+            modal.show();
+        }
+
+        // 创建分享
+        async function createShare() {
+            const password = document.getElementById('newSharePassword').value;
+            const formData = new FormData();
+            formData.append('action', 'createShare');
+            formData.append('filename', currentShareFile);
+            formData.append('password', password);
+
+            try {
+                const response = await fetch('file_handler.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('创建分享失败');
+                const data = await response.json();
+                
+                // 显示分享链接
+                const shareLink = `${window.location.origin}/share.php?id=${data.shareId}`;
+                document.getElementById('shareLinkInput').value = shareLink;
+                document.getElementById('shareLink').classList.remove('d-none');
+                
+                // 刷新显示
+                await showShareModal(currentShareFile);
+            } catch (error) {
+                alert('创建分享失败：' + error.message);
+            }
+        }
+
+        // 取消分享
+        async function cancelShare() {
+            if (!confirm('确定要取消分享吗？')) return;
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', 'cancelShare');
+                formData.append('filename', currentShareFile);
+
+                const response = await fetch('file_handler.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('取消分享失败');
+                
+                // 刷新显示
+                await showShareModal(currentShareFile);
+            } catch (error) {
+                alert('取消分享失败：' + error.message);
+            }
+        }
+
+        // 复制分享链接
+        function copyShareLink(elementId) {
+            const linkInput = document.getElementById(elementId);
+            linkInput.select();
+            document.execCommand('copy');
+            alert('链接已复制到剪贴板！');
+        }
+
+        // 显示修改密码表单
+        function showModifyPassword() {
+            document.getElementById('modifyPasswordForm').classList.remove('d-none');
+            document.getElementById('modifiedPassword').value = '';
+        }
+
+        // 取消修改密码
+        function cancelModifyPassword() {
+            document.getElementById('modifyPasswordForm').classList.add('d-none');
+        }
+
+        // 更新分享密码
+        async function updateSharePassword() {
+            const newPassword = document.getElementById('modifiedPassword').value;
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', 'updateSharePassword');
+                formData.append('filename', currentShareFile);
+                formData.append('password', newPassword);
+
+                const response = await fetch('file_handler.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('修改密码失败');
+                
+                // 刷新显示
+                await showShareModal(currentShareFile);
+                // 隐藏修改密码表单
+                cancelModifyPassword();
+                alert('密码修改成功！');
+            } catch (error) {
+                alert('修改密码失败：' + error.message);
+            }
+        }
+
+        // 关闭分享模态框
+        function closeShareModal() {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal'));
+            modal.hide();
+            // 移除模态框背景
+            const modalBackdrop = document.querySelector('.modal-backdrop');
+            if (modalBackdrop) {
+                modalBackdrop.remove();
+            }
+            // 移除 body 的 modal-open 类
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        }
+
+        // 显示设置模态框
+        function showSettingsModal() {
+            const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+            // 清空表单
+            document.getElementById('changePasswordForm').reset();
+            modal.show();
+        }
+
+        // 处理修改密码
+        document.getElementById('changePasswordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // 验证新密码
+            if (newPassword !== confirmPassword) {
+                alert('两次输入的新密码不一致！');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'changePassword');
+                formData.append('currentPassword', currentPassword);
+                formData.append('newPassword', newPassword);
+
+                const response = await fetch('file_handler.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('密码修改成功！');
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+                    modal.hide();
+                } else {
+                    alert(data.error || '密码修改失败！');
+                }
+            } catch (error) {
+                console.error('修改密码失败:', error);
+                alert('修改密码失败，请重试！');
+            }
+        });
+    </script>
+</body>
+</html> 
